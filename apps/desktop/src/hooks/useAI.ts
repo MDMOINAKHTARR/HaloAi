@@ -3,7 +3,7 @@ import { useState, useCallback } from 'react';
 const ZAI_API_URL = 'https://api.z.ai/api/coding/paas/v4/chat/completions';
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const ZAI_MODEL = 'GLM-5.1';
-const GROQ_MODEL = 'llama3-70b-8192';
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
 const PRIMARY_TIMEOUT_MS = 10000;
 
 export interface MessageContent {
@@ -66,11 +66,12 @@ async function callLLM(
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${apiKey}`,
-                'User-Agent': 'HaloAI-Desktop/1.0',
             },
             body: JSON.stringify({ model, ...body }),
             signal: controller.signal,
         });
+
+        clearTimeout(timeout); // Clear TTFB timeout so stream doesn't abort
 
         if (!response.ok) {
             const errBody = await response.text();
@@ -214,7 +215,7 @@ export function useAI() {
 export function buildUserMessage(text: string, _screenshot?: string): Message {
     return {
         role: 'user',
-        content: text || 'Help me with what is currently on my screen.',
+        content: text || 'Help me with my current task.',
     };
 }
 
@@ -344,10 +345,10 @@ Always prioritize clarity, correctness, and transaction safety.
 - Avoid long unbroken text blocks
 - Keep responses container-friendly (no overflow)`;
 
-    // CRITICAL: If vision context exists, make it CLEAR that you have the screen content
+    // Build environment context section if available
     const visionSection = visionContext
-        ? `\n\n━━━ SCREEN CONTEXT (TEXT DESCRIPTION) ━━━\n${visionContext}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n✅ The text above is an automated TEXT description of the user's screen. Use it to help them.\n✅ Reference specific details from the screen context in your response.\n✅ If something is unclear, state what's missing and ask ONE specific question.\n❌ NEVER say you cannot see images or screenshots — you receive TEXT descriptions, not images.`
-        : '\n\n⚠️ No screen context available this time.\n\n❌ NEVER say "I cannot see your screen" or "I do not have access to your screen"\n❌ NEVER ask user to "paste the text" or "upload a screenshot"\n✅ INSTEAD say: "Could you describe what you\'re working on?" or "What specific part needs help?"\n\nIf context is missing, ask about their task, NOT for manual uploads.';
+        ? `\n\n━━━ USER ENVIRONMENT CONTEXT ━━━\n${visionContext}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nThe text above describes the user's current working environment. Use it to provide relevant assistance.\nReference specific details from this context in your response when helpful.\nIf something is unclear, ask ONE specific question.`
+        : '';
 
     const formattingRules = `\n\n📋 OUTPUT FORMATTING (MANDATORY):\n- Use clear headings (##)\n- Use bullet points for lists\n- Code MUST be in fenced blocks: \`\`\`language\n- Code blocks must be ONE-CLICK copyable (no commentary inside)\n- Keep paragraphs short (2-3 sentences max)\n- Use bold for emphasis\n- NEVER mix code and explanation in the same block`;
 
@@ -722,10 +723,10 @@ Just ask naturally, and I'll guide you through the process!`;
         case 'dev':
             return `${basePrompt}${visionSection}
 
-**CONTEXT**: Developer Mode — an IDE was detected on the user's screen.
+**CONTEXT**: Developer Mode — an IDE or development tool was detected in the user's environment.
 
 **RESPONSE FORMAT** (follow strictly):
-1. **Diagnosis** — 1-2 sentences identifying the issue or summarizing what's on screen.
+1. **Diagnosis** — 1-2 sentences identifying the issue or summarizing what's shown.
 2. **Fix** — Exact code changes in unified diff format:
 \`\`\`diff
 - old line
@@ -740,12 +741,12 @@ command here
 **RULES**:
 - Be terse. No filler, no encouragement, no pleasantries.
 - Use diff format for code changes, not full file rewrites.
-- Reference exact file paths and line numbers when visible on screen.
-- Prioritize addressing errors and stack traces visible on screen.
-- If no specific problem is visible, summarize what's on screen in 2-3 bullet points and ask one focused question.
+- Reference exact file paths and line numbers when available in context.
+- Prioritize addressing errors and stack traces visible in context.
+- If no specific problem is visible, summarize the environment in 2-3 bullet points and ask one focused question.
 - Code blocks must use proper language tags (\`\`\`diff, \`\`\`bash, \`\`\`typescript, etc.).
 - Keep total response under 300 words unless the fix is genuinely complex.
-- NEVER say "I can't see your screen" — you have the TEXT description of the screen context above.`;
+- NEVER mention what you can or cannot see. Work with the context provided above.`;
 
         case 'coding':
             return `${basePrompt}${visionSection}${formattingRules}
@@ -754,7 +755,7 @@ command here
 
 **YOUR ROLE**:
 ✅ Provide working, copy-paste ready code
-✅ Debug errors by referencing screen context${visionContext ? ' (already provided above)' : ''}
+✅ Debug errors by referencing available context${visionContext ? ' (provided above)' : ''}
 ✅ Explain WHY the fix works
 ✅ Use proper syntax highlighting
 
@@ -764,9 +765,8 @@ command here
 3. **Why It Works** - Technical reasoning
 
 **CRITICAL RULES**:
-❌ NEVER say "I can't see your screen" (you have the TEXT context above)
-❌ NEVER ask to upload screenshots or paste code (already provided)
-❌ NEVER say you cannot process images or screenshots (you receive TEXT descriptions)
+❌ NEVER mention what you can or cannot see
+❌ NEVER ask the user to upload anything or paste anything
 ❌ NEVER put explanations inside code blocks
 ✅ START with the solution immediately
 ✅ Code blocks must use proper language tags
@@ -779,7 +779,7 @@ command here
 
 **YOUR ROLE**:
 ✅ Draft professional, clean emails
-✅ Match the tone (formal/casual)${visionContext ? '\n✅ Use context from the screen (thread tone, recipient, etc.)' : ''}
+✅ Match the tone (formal/casual)${visionContext ? '\n✅ Use context from the environment (thread tone, recipient, etc.)' : ''}
 ✅ Make it copy-paste ready
 
 **EMAIL STRUCTURE**:
@@ -808,7 +808,7 @@ Subject: [Clear, action-oriented]
 
 **YOUR ROLE**:
 ✅ Fix grammar and improve clarity
-✅ Rewrite for better flow${visionContext ? '\n✅ Use the text from screen context (already provided)' : ''}
+✅ Rewrite for better flow${visionContext ? '\n✅ Use the text from the context provided above' : ''}
 ✅ Make output immediately usable
 
 **RESPONSE STRUCTURE**:
@@ -816,7 +816,7 @@ Subject: [Clear, action-oriented]
 2. **Key Changes** - Bullet list (2-4 items)
 
 **CRITICAL RULES**:
-❌ NEVER say "Please paste the text" (you have it from screen context)
+❌ NEVER say "Please paste the text" (you have it from context)
 ❌ NEVER mix the corrected text with commentary
 ✅ Put the FINAL version in a copyable block
 ✅ Explain changes briefly (under 100 words)
@@ -841,7 +841,7 @@ Explain Stellar concepts using plain language.
 ✅ Avoid jargon unless necessary
 ✅ Explain one concept at a time
 ✅ Be simple and clear
-${visionContext ? '✅ Reference specific details from the screen if relevant' : ''}`;
+${visionContext ? '✅ Reference specific details from the context if relevant' : ''}`;
     }
 }
 

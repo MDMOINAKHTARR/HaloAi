@@ -162,17 +162,32 @@ router.post('/:userId/send', async (req: Request, res: Response) => {
         const sourceKeypair = StellarSdk.Keypair.fromSecret(secretKey);
         const account = await horizon.loadAccount(wallet.public_key);
 
+        let operation: any;
+        try {
+            await horizon.loadAccount(to);
+            // Account exists, use standard payment
+            operation = StellarSdk.Operation.payment({
+                destination: to,
+                asset: StellarSdk.Asset.native(),
+                amount: String(amount),
+            });
+        } catch (err: any) {
+            // If the account does not exist (404), we must fund it with createAccount
+            if (err.response && err.response.status === 404) {
+                operation = StellarSdk.Operation.createAccount({
+                    destination: to,
+                    startingBalance: String(amount),
+                });
+            } else {
+                throw err;
+            }
+        }
+
         const tx = new StellarSdk.TransactionBuilder(account, {
             fee: StellarSdk.BASE_FEE,
             networkPassphrase: StellarSdk.Networks.TESTNET,
         })
-            .addOperation(
-                StellarSdk.Operation.payment({
-                    destination: to,
-                    asset: StellarSdk.Asset.native(),
-                    amount: String(amount),
-                })
-            )
+            .addOperation(operation)
             .setTimeout(30)
             .build();
 
@@ -183,7 +198,15 @@ router.post('/:userId/send', async (req: Request, res: Response) => {
         return res.json({ txHash: result.hash, balance });
     } catch (err: any) {
         console.error('[Wallets] Send error:', err.message);
-        return res.status(500).json({ error: 'Failed to send XLM' });
+        if (err.response && err.response.data && err.response.data.extras) {
+            console.error('[Wallets] Send error extras:', JSON.stringify(err.response.data.extras));
+            const resultCodes = err.response.data.extras.result_codes;
+            if (resultCodes) {
+                const opCodes = resultCodes.operations ? resultCodes.operations.join(', ') : '';
+                return res.status(500).json({ error: `Transaction failed: ${resultCodes.transaction} ${opCodes ? `(${opCodes})` : ''}` });
+            }
+        }
+        return res.status(500).json({ error: err.message || 'Failed to send XLM' });
     }
 });
 

@@ -23,10 +23,10 @@ export function useVision() {
 
             if (extractedText) {
                 console.log('[Vision] OCR extracted', extractedText.length, 'characters');
-                return `Screen text extracted via OCR:\n\n${extractedText}`;
+                return `User environment details:\n\n${extractedText}`;
             } else {
                 console.warn('[Vision] OCR found no text');
-                return '[Screenshot captured but no text could be extracted]';
+                return '[Environment captured but no text could be extracted]';
             }
         } catch (error) {
             // Never throw - always return safe fallback
@@ -34,7 +34,7 @@ export function useVision() {
             if (error instanceof Error) {
                 console.error('[Vision] OCR error message:', error.message);
             }
-            return '[Screenshot captured but OCR failed]';
+            return '[Environment captured but OCR failed]';
         }
     }, []);
 
@@ -163,7 +163,7 @@ Be specific and thorough.`
                 console.error('[Vision] Error message:', error.message);
                 console.error('[Vision] Error stack:', error.stack);
             }
-            return '[Vision analysis failed - proceeding without visual context]';
+            return '[Environment analysis failed - proceeding without context]';
         } finally {
             setIsAnalyzing(false);
         }
