@@ -348,7 +348,7 @@ HaloAI/
 
 ## Hackathon Context
 
-- **Team**: Kaizen (Team #12)
+- **Team**: Enigma (Team #12)
 - **Project**: Halo AI
 - **Built for**: Fast-paced innovation with modern AI infrastructure
 - **Focus**: Desktop-native AI assistant with embedded blockchain wallet + on-chain strategy verification

@@ -17,7 +17,7 @@ export function LargeTestimonial() {
                   <img src="/images/elmo.jpeg" alt="Simmy" className="w-full h-full object-cover" />
                 </div>
                 <div className="flex flex-col justify-start items-start">
-                  <div className="text-foreground text-base font-medium leading-6">Team Kaizen</div>
+                  <div className="text-foreground text-base font-medium leading-6">Team Enigma</div>
                   <div className="text-muted-foreground text-sm font-normal leading-6">HaloAI</div>
                 </div>
               </div>
