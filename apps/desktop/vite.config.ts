@@ -4,7 +4,7 @@ import electron from 'vite-plugin-electron';
 import renderer from 'vite-plugin-electron-renderer';
 import path from 'path';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
     plugins: [
         react(),
         electron([
@@ -13,6 +13,8 @@ export default defineConfig({
                 vite: {
                     build: {
                         outDir: 'dist-electron',
+                        minify: mode === 'production',
+                        sourcemap: mode !== 'production',
                         rollupOptions: {
                             external: ['electron'],
                             output: {
@@ -30,7 +32,7 @@ export default defineConfig({
                 vite: {
                     build: {
                         outDir: 'dist-electron',
-                        sourcemap: 'inline',
+                        sourcemap: mode !== 'production' ? 'inline' : false,
                         rollupOptions: {
                             external: ['electron'],
                             output: {
@@ -51,5 +53,18 @@ export default defineConfig({
     },
     build: {
         outDir: 'dist',
+        sourcemap: false,
+        chunkSizeWarningLimit: 1000,
+        rollupOptions: {
+            output: {
+                manualChunks: {
+                    react: ['react', 'react-dom'],
+                    markdown: ['react-markdown', 'react-syntax-highlighter'],
+                },
+            },
+        },
     },
-});
+    define: {
+        'process.env.NODE_ENV': JSON.stringify(mode),
+    },
+}));

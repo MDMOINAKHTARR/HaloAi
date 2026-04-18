@@ -1,6 +1,7 @@
 import { app, BrowserWindow, globalShortcut, ipcMain, Tray, Menu, nativeImage, desktopCapturer, screen } from 'electron';
 import path from 'path';
 import fs from 'fs';
+import { autoUpdater } from 'electron-updater';
 
 // Simple JSON file store (replaces electron-store to avoid pnpm/Electron compatibility issues)
 class SimpleStore {
@@ -440,6 +441,41 @@ function setupIPC() {
     });
 }
 
+// ─── Auto-updater ────────────────────────────────────────────────────────────
+function setupAutoUpdater() {
+    // Only run in packaged production builds
+    if (process.env.NODE_ENV === 'development' || process.env.VITE_DEV_SERVER_URL) return;
+
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+
+    autoUpdater.on('checking-for-update', () => {
+        console.log('[Updater] Checking for update...');
+    });
+
+    autoUpdater.on('update-available', (info) => {
+        console.log('[Updater] Update available:', info.version);
+        mainWindow?.webContents.send('update-available', info.version);
+    });
+
+    autoUpdater.on('update-not-available', () => {
+        console.log('[Updater] App is up to date.');
+    });
+
+    autoUpdater.on('update-downloaded', () => {
+        console.log('[Updater] Update downloaded — will install on quit.');
+        mainWindow?.webContents.send('update-downloaded');
+    });
+
+    autoUpdater.on('error', (err) => {
+        console.error('[Updater] Error:', err.message);
+    });
+
+    // Check immediately, then every 4 hours
+    autoUpdater.checkForUpdatesAndNotify();
+    setInterval(() => autoUpdater.checkForUpdatesAndNotify(), 4 * 60 * 60 * 1000);
+}
+
 // Deep link handling
 app.setAsDefaultProtocolClient('halo');
 
@@ -464,6 +500,7 @@ app.whenReady().then(() => {
     createTray();
     registerHotkeys();
     setupIPC();
+    setupAutoUpdater();
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
